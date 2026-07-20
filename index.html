@@ -293,6 +293,23 @@ function viewDash(){
     </div>
   </div>
 
+
+  <div class="card">
+    <h2>Barclays check <span class="sub">optional comfort glance</span></h2>
+    ${(()=>{const u=unpaidBillsThisPeriod();const need=u.total+num(state.settings.buffer);
+      const c=state.settings.barclaysCheck;
+      const stale=c&&c.date!==todayISO();
+      return `
+      <p style="font-size:.88rem">Bills still to leave this period: <b class="money">${gbp(u.total)}</b>${u.items.length?` (${u.items.map(i=>esc(i.name)).join(", ")})`:""}. With the ${gbp(state.settings.buffer)} floor, Barclays should hold at least <b class="money">${gbp(need)}</b>.</p>
+      <div class="flexrow" style="margin-top:10px">
+        <input class="num" id="barcBal" style="width:120px" placeholder="Balance" value="${c?c.balance:""}">
+        <button class="btn small" onclick="doBarclaysCheck()">Check</button>
+      </div>
+      ${c?`<p class="hint" style="margin-top:8px">${c.balance>=need
+        ?`<span class="chip green">Covered</span> ${gbp(c.balance)} on ${fmtDate(c.date)} leaves ${gbp(c.balance-need)} above what is needed.`
+        :`<span class="chip claret">Short</span> ${gbp(c.balance)} on ${fmtDate(c.date)} is ${gbp(need-c.balance)} below what is needed; top up from a bucket or the next envelope.`}${stale?" This check is from a previous day; enter today's balance for a fresh one.":""}</p>`:""}`})()}
+  </div>
+
   <div class="card">
     <h2>This period at a glance</h2>
     <table class="ledger"><tbody>
@@ -323,6 +340,27 @@ function toggleTransfer(id){
   const p=currentPeriod();const t=(p.transfers||[]).find(x=>x.id===id);
   if(t){t.done=!t.done;persist();render();if(t.done)toast("Stamped. "+gbp(t.amount)+" moved to Starling.")}
 }
+
+function unpaidBillsThisPeriod(){
+  const p=currentPeriod();if(!p)return {total:0,items:[]};
+  const start=new Date(p.start+"T12:00:00"),end=new Date(p.end+"T12:00:00");
+  const today=new Date();today.setHours(12,0,0,0);
+  const items=[];
+  for(const b of state.bills){
+    const day=Number(b.day);
+    const base=day>=28?start:end;
+    const due=new Date(base.getFullYear(),base.getMonth(),day,12);
+    if(due>=start&&due<=end&&due>=today)items.push({name:b.name,amount:num(b.amount),due});
+  }
+  items.sort((a,c)=>a.due-c.due);
+  return {total:items.reduce((a,c)=>a+c.amount,0),items};
+}
+function doBarclaysCheck(){
+  const bal=num(document.getElementById("barcBal").value);
+  state.settings.barclaysCheck={balance:bal,date:todayISO()};
+  persist();render();
+}
+
 function markReimb(pid){
   const p=state.periods.find(x=>x.id===pid);if(!p)return;
   p.reimbReceived=num(document.getElementById("reimbActual").value);
