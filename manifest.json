@@ -1,0 +1,21 @@
+{
+  "name": "Ledger",
+  "short_name": "Ledger",
+  "description": "Payday on the 28th. Bills from Barclays, buckets in savings, spending on Starling.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F7F5EF",
+  "theme_color": "#1E2A38",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
