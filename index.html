@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledger</title>
+<style>
+:root{
+  --paper:#F7F5EF; --card:#FFFFFF; --ink:#1E2A38; --ink-soft:#4A5766; --ink-faint:#8B94A0;
+  --green:#2E6E4E; --green-soft:#E4EEE8; --claret:#8C3A3A; --claret-soft:#F3E6E6;
+  --brass:#A8842C; --brass-soft:#F4EDDC; --rule:#DDD8CC; --rule-soft:#EAE6DC;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono",Consolas,Menlo,monospace;
+  --serif:Charter,Georgia,"Times New Roman",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.5;min-height:100vh}
+body::before{content:"";position:fixed;top:0;left:0;right:0;height:6px;background:repeating-linear-gradient(90deg,var(--ink) 0 14px,var(--brass) 14px 16px);z-index:50}
+.wrap{max-width:880px;margin:0 auto;padding:26px 16px 90px}
+header.mast{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+.mast h1{font-family:var(--serif);font-weight:700;font-size:1.9rem;letter-spacing:.01em}
+.mast h1 span{color:var(--brass)}
+.mast .period-label{font-family:var(--mono);font-size:.8rem;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.08em}
+.tagline{font-size:.82rem;color:var(--ink-faint);margin-bottom:18px}
+nav.tabs{display:flex;gap:2px;border-bottom:2px solid var(--ink);margin-bottom:22px;flex-wrap:wrap}
+nav.tabs button{appearance:none;border:1px solid var(--rule);border-bottom:none;background:var(--rule-soft);
+  padding:8px 14px;font-family:var(--sans);font-size:.85rem;color:var(--ink-soft);cursor:pointer;
+  border-radius:6px 6px 0 0;position:relative;top:0}
+nav.tabs button.active{background:var(--card);color:var(--ink);font-weight:600;border-color:var(--ink);border-bottom:2px solid var(--card);top:2px}
+nav.tabs button:focus-visible{outline:2px solid var(--brass);outline-offset:-2px}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:8px;padding:18px;margin-bottom:16px}
+.card h2{font-family:var(--serif);font-size:1.12rem;margin-bottom:10px;display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.card h2 .sub{font-family:var(--sans);font-size:.75rem;font-weight:400;color:var(--ink-faint)}
+.hint{font-size:.78rem;color:var(--ink-faint);margin-top:8px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:640px){.grid2{grid-template-columns:1fr}}
+.bignum{font-family:var(--mono);font-size:2.3rem;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.bignum.green{color:var(--green)}
+.biglabel{font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-soft);margin-bottom:2px}
+.money{font-family:var(--mono);font-variant-numeric:tabular-nums}
+table.ledger{width:100%;border-collapse:collapse;font-size:.88rem}
+table.ledger th{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);
+  text-align:left;padding:6px 8px;border-bottom:2px solid var(--ink)}
+table.ledger td{padding:7px 8px;border-bottom:1px solid var(--rule-soft);vertical-align:middle}
+table.ledger td.num,table.ledger th.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+table.ledger tr:hover td{background:var(--paper)}
+.bar{height:9px;background:var(--rule-soft);border-radius:5px;overflow:hidden;min-width:70px}
+.bar i{display:block;height:100%;background:var(--green);border-radius:5px}
+.bar i.warn{background:var(--claret)}
+.chip{display:inline-block;font-size:.72rem;padding:2px 9px;border-radius:10px;border:1px solid;font-weight:600}
+.chip.green{color:var(--green);border-color:var(--green);background:var(--green-soft)}
+.chip.claret{color:var(--claret);border-color:var(--claret);background:var(--claret-soft)}
+.chip.brass{color:var(--brass);border-color:var(--brass);background:var(--brass-soft)}
+.chip.grey{color:var(--ink-soft);border-color:var(--rule);background:var(--rule-soft)}
+button.btn{appearance:none;border:1px solid var(--ink);background:var(--ink);color:#fff;padding:8px 16px;
+  border-radius:6px;font-size:.85rem;font-weight:600;cursor:pointer;font-family:var(--sans)}
+button.btn.quiet{background:var(--card);color:var(--ink)}
+button.btn.small{padding:4px 10px;font-size:.76rem}
+button.btn.danger{border-color:var(--claret);background:var(--card);color:var(--claret)}
+button.btn:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+button.btn:disabled{opacity:.45;cursor:default}
+input,select,textarea{font-family:var(--sans);font-size:.88rem;color:var(--ink);background:#FDFCF9;
+  border:1px solid var(--rule);border-radius:5px;padding:6px 8px}
+input.num{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--brass);outline-offset:0;border-color:var(--brass)}
+input.editable{background:#FBF6E4}
+.formrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--rule-soft);flex-wrap:wrap}
+.formrow label{font-size:.86rem;color:var(--ink-soft)}
+/* counterfoil strip: the weekly envelope tickets */
+.stubs{display:flex;gap:0;flex-wrap:wrap;margin-top:6px}
+.stub{border:1px solid var(--ink);border-radius:4px;padding:10px 12px;min-width:118px;background:var(--card);
+  position:relative;margin-right:14px;margin-bottom:10px;cursor:pointer;transition:background .15s}
+.stub::after{content:"";position:absolute;right:-9px;top:6px;bottom:6px;border-right:2px dotted var(--ink-faint)}
+.stub:last-child::after{display:none}
+.stub .s-date{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft)}
+.stub .s-amt{font-family:var(--mono);font-weight:600;font-size:1.02rem;margin-top:2px}
+.stub.done{background:var(--green-soft)}
+.stub.done .s-amt{color:var(--green)}
+.stub .s-stamp{display:none;position:absolute;top:4px;right:6px;font-size:.6rem;font-weight:700;
+  color:var(--green);border:1.5px solid var(--green);border-radius:3px;padding:0 4px;transform:rotate(-8deg);
+  text-transform:uppercase;letter-spacing:.06em;background:var(--card)}
+.stub.done .s-stamp{display:block}
+.stub.due{border-color:var(--brass);box-shadow:0 0 0 2px var(--brass-soft)}
+.stub:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+/* adviser chat */
+.chat{display:flex;flex-direction:column;gap:10px;max-height:460px;overflow-y:auto;padding:4px 2px;margin-bottom:12px}
+.msg{max-width:88%;padding:10px 13px;border-radius:8px;font-size:.89rem;white-space:pre-wrap}
+.msg.user{align-self:flex-end;background:var(--ink);color:#fff;border-bottom-right-radius:2px}
+.msg.adviser{align-self:flex-start;background:var(--brass-soft);border:1px solid var(--rule);border-bottom-left-radius:2px}
+.msg.adviser b{font-weight:700}
+.chatbar{display:flex;gap:8px}
+.chatbar textarea{flex:1;resize:vertical;min-height:44px}
+.notebook li{font-size:.84rem;margin:4px 0 4px 16px;color:var(--ink-soft)}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;
+  padding:9px 18px;border-radius:6px;font-size:.85rem;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99}
+.toast.show{opacity:1}
+.empty{font-size:.85rem;color:var(--ink-faint);padding:14px 0;text-align:center}
+details.bucket-log summary{cursor:pointer;font-size:.78rem;color:var(--ink-soft)}
+.flexrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.warn-text{color:var(--claret);font-weight:600}
+.ok-text{color:var(--green);font-weight:600}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="mast">
+    <h1>Ledger<span>.</span></h1>
+    <div class="period-label" id="mastPeriod"></div>
+  </header>
+  <p class="tagline">Payday on the 28th. Bills from Barclays, buckets in savings, spending on Starling.</p>
+  <nav class="tabs" id="tabs"></nav>
+  <main id="view"></main>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+"use strict";
+/* ------------------------ state ------------------------ */
+const LS_KEY="ledger.state.v1", LS_TOKEN="ledger.ghtoken", LS_APIKEY="ledger.apikey";
+const uid=()=>Math.random().toString(36).slice(2,10);
+const todayISO=()=>new Date().toISOString().slice(0,10);
+
+function seedState(){
+  return {
+    version:1,updatedAt:new Date().toISOString(),
+    settings:{pay:0,expectedReimb:0,buffer:150,gistId:"",owner:""},
+    bills:[],buckets:[],periods:[],
+    adviser:{notebook:[],messages:[],mode:"review"}
+  };
+}
+let state=null;
+try{state=JSON.parse(localStorage.getItem(LS_KEY))}catch(e){state=null}
+if(!state||!state.version){state=seedState();persist(false)}
+
+function persist(touch=true){
+  if(touch)state.updatedAt=new Date().toISOString();
+  localStorage.setItem(LS_KEY,JSON.stringify(state));
+}
+
+/* ------------------------ helpers ------------------------ */
+const gbp=n=>{if(n==null||isNaN(n))return "";return "£"+Number(n).toLocaleString("en-GB",{minimumFractionDigits:2,maximumFractionDigits:2})};
+const gbp0=n=>{if(n==null||isNaN(n))return "";return "£"+Math.round(Number(n)).toLocaleString("en-GB")};
+const num=v=>{const n=parseFloat(String(v).replace(/[£,\s]/g,""));return isNaN(n)?0:n};
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtDate=iso=>{if(!iso)return"";const d=new Date(iso+"T12:00:00");return d.toLocaleDateString("en-GB",{day:"numeric",month:"short"})};
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2200)}
+const currentPeriod=()=>state.periods.length?state.periods[state.periods.length-1]:null;
+const sumBills=()=>state.bills.reduce((a,b)=>a+num(b.amount),0);
+const sumMove=held=>state.buckets.filter(b=>b.heldIn===held).reduce((a,b)=>a+num(b.monthly),0);
+const discretionaryOf=p=>num(p.income)+num(p.reimbExpectedUsed??(p.reimbPaid?p.reimbReceived:p.reimbExpected))-num(p.billsTotal)-num(p.moveSavings)-num(p.moveISA);
+
+function monthsUntil(iso){
+  if(!iso)return null;
+  const now=new Date(),d=new Date(iso+"T12:00:00");
+  let m=(d.getFullYear()-now.getFullYear())*12+(d.getMonth()-now.getMonth());
+  if(d.getDate()>=now.getDate())m+=0;else m-=0;
+  return Math.max(m,0);
+}
+function targetMaths(b){
+  if(!b.goal||!b.targetDate)return null;
+  const m=Math.max(monthsUntil(b.targetDate),1);
+  const remaining=Math.max(num(b.goal)-num(b.balance),0);
+  const required=remaining/m;
+  const drift=required-num(b.monthly);
+  return {monthsLeft:m,remaining,required,drift,onTrack:drift<=0.5};
+}
+function nextPeriodDates(){
+  const last=currentPeriod();
+  let start;
+  if(last){const e=new Date(last.end+"T12:00:00");e.setDate(e.getDate()+1);start=e}
+  else{start=new Date();start.setDate(28)}
+  const end=new Date(start);end.setMonth(end.getMonth()+1);end.setDate(27);
+  const iso=d=>d.toISOString().slice(0,10);
+  const label=fmtDate(iso(start))+" to "+fmtDate(iso(end));
+  return {start:iso(start),end:iso(end),label};
+}
+function buildTransfers(startISO,endISO,discretionary){
+  const start=new Date(startISO+"T12:00:00"),end=new Date(endISO+"T12:00:00");
+  const days=Math.round((end-start)/86400000)+1;
+  const n=Math.ceil(days/7);
+  const each=Math.floor((discretionary/n)*100)/100;
+  const t=[];
+  for(let i=0;i<n;i++){
+    const d=new Date(start);d.setDate(d.getDate()+i*7);
+    const amt=(i===n-1)?Math.round((discretionary-each*(n-1))*100)/100:each;
+    t.push({id:uid(),date:d.toISOString().slice(0,10),amount:amt,done:false});
+  }
+  return t;
+}
+function billsInNext7Days(){
+  const now=new Date();const out=[];
+  for(const b of state.bills){
+    for(let add=0;add<=7;add++){
+      const d=new Date(now);d.setDate(d.getDate()+add);
+      if(d.getDate()===Number(b.day)){out.push({...b,when:d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"}),inDays:add});break}
+    }
+  }
+  return out.sort((a,c)=>a.inDays-c.inDays);
+}
+/* ------------------------ tabs + render ------------------------ */
+const TABS=[["dash","Dashboard"],["buckets","Buckets"],["periods","Periods"],["setup","Setup"],["adviser","Adviser"],["sync","Sync"]];
+let activeTab=location.hash.replace("#","")||"dash";
+function renderTabs(){
+  document.getElementById("tabs").innerHTML=TABS.map(([id,label])=>
+    `<button class="${id===activeTab?'active':''}" onclick="go('${id}')">${label}</button>`).join("");
+}
+function go(tab){activeTab=tab;location.hash=tab;render()}
+function render(){
+  renderTabs();
+  const p=currentPeriod();
+  document.getElementById("mastPeriod").textContent=p?p.label:"";
+  const v=document.getElementById("view");
+  if(activeTab==="dash")v.innerHTML=viewDash();
+  else if(activeTab==="buckets")v.innerHTML=viewBuckets();
+  else if(activeTab==="periods")v.innerHTML=viewPeriods();
+  else if(activeTab==="setup")v.innerHTML=viewSetup();
+  else if(activeTab==="adviser"){v.innerHTML=viewAdviser();const c=document.getElementById("chat");if(c)c.scrollTop=c.scrollHeight}
+  else if(activeTab==="sync")v.innerHTML=viewSync();
+}
+
+/* ------------------------ dashboard ------------------------ */
+function viewDash(){
+  const p=currentPeriod();
+  if(!p)return `<div class="card"><h2>Welcome to Ledger</h2><p style="font-size:.9rem">This copy starts empty. Go to the Sync tab and either import your ledger-data.json backup or pull from your Gist, then everything appears here.</p></div>`;
+  const disc=discretionaryOf(p);
+  const transfers=p.transfers||[];
+  const nDone=transfers.filter(t=>t.done).length;
+  const next=transfers.find(t=>!t.done);
+  const weekly=next?next.amount:(transfers.length?transfers[0].amount:disc/4.33);
+  const radar=billsInNext7Days();
+  const reimbPending=!p.reimbPaid;
+  const savingsTotal=state.buckets.reduce((a,b)=>a+num(b.balance),0);
+  const bySav=state.buckets.filter(b=>b.heldIn==="Savings account").reduce((a,b)=>a+num(b.balance),0);
+  const byISA=state.buckets.filter(b=>b.heldIn==="ISA").reduce((a,b)=>a+num(b.balance),0);
+  const driftFlags=state.buckets.map(b=>({b,t:targetMaths(b)})).filter(x=>x.t&&!x.t.onTrack);
+
+  return `
+  <div class="grid2">
+    <div class="card">
+      <div class="biglabel">This week's envelope</div>
+      <div class="bignum green">${gbp(weekly)}</div>
+      <p class="hint">Move it to Starling, then spend from Starling only. What is on the card is what is safe to spend.</p>
+    </div>
+    <div class="card">
+      <div class="biglabel">Barclays floor</div>
+      <div class="bignum">${gbp(state.settings.buffer)}</div>
+      <p class="hint">Keep at least this in the current account for anything you forgot to budget. If you dip into it, top it back up from next week's envelope or a bucket.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Weekly transfers to Starling <span class="sub">${nDone} of ${transfers.length} moved this period</span></h2>
+    <div class="stubs">
+      ${transfers.map(t=>`
+        <div class="stub ${t.done?'done':''} ${(!t.done&&next&&t.id===next.id)?'due':''}" tabindex="0" role="button"
+             aria-pressed="${t.done}" onclick="toggleTransfer('${t.id}')" onkeydown="if(event.key==='Enter')toggleTransfer('${t.id}')">
+          <div class="s-stamp">Moved</div>
+          <div class="s-date">${fmtDate(t.date)}${t.label?` · ${esc(t.label)}`:""}</div>
+          <div class="s-amt">${gbp(t.amount)}</div>
+        </div>`).join("")||`<p class="empty">No transfers set for this period.</p>`}
+    </div>
+    <p class="hint">Tap a stub once the money has moved. The highlighted stub is the next one due.</p>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Bill radar <span class="sub">leaving Barclays in the next 7 days</span></h2>
+      ${radar.length?`<table class="ledger"><tbody>
+        ${radar.map(b=>`<tr><td>${esc(b.name)}</td><td>${b.when}</td><td class="num">${gbp(b.amount)}</td></tr>`).join("")}
+        <tr><td colspan="2"><b>Total</b></td><td class="num"><b>${gbp(radar.reduce((a,b)=>a+num(b.amount),0))}</b></td></tr>
+      </tbody></table>`:`<p class="empty">Nothing due in the next week.</p>`}
+    </div>
+    <div class="card">
+      <h2>Reimbursement</h2>
+      ${reimbPending?`
+        <p style="font-size:.9rem">Expected reimbursement this period: <b class="money">${gbp(p.reimbExpected)}</b></p>
+        <p class="hint" style="margin:6px 0 10px">After the sit down, enter the real figure and mark it received.</p>
+        <div class="flexrow">
+          <input class="num" id="reimbActual" style="width:110px" value="${p.reimbExpected}">
+          <button class="btn small" onclick="markReimb('${p.id}')">Mark received</button>
+        </div>
+        <p class="hint" style="margin-top:8px"><span class="chip brass">Pending</span> Discretionary currently assumes the expected figure.</p>`
+      :`
+        <p style="font-size:.9rem">Received this period: <b class="money ok-text">${gbp(p.reimbReceived)}</b></p>
+        <p class="hint" style="margin-top:6px"><span class="chip green">Received</span> ${num(p.reimbReceived)!==num(p.reimbExpected)?`Expected ${gbp(p.reimbExpected)}; discretionary uses the real figure.`:"Matched the expected figure."}</p>
+        <button class="btn small quiet" style="margin-top:10px" onclick="unmarkReimb('${p.id}')">Undo</button>`}
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>This period at a glance</h2>
+    <table class="ledger"><tbody>
+      <tr><td>Pay received</td><td class="num">${gbp(p.income)}</td></tr>
+      <tr><td>Reimbursement ${p.reimbPaid?"received":"expected"}</td><td class="num">${gbp(p.reimbPaid?p.reimbReceived:p.reimbExpected)}</td></tr>
+      <tr><td>Bills</td><td class="num">${gbp(p.billsTotal)}</td></tr>
+      <tr><td>To Savings account</td><td class="num">${gbp(p.moveSavings)}</td></tr>
+      <tr><td>To ISA</td><td class="num">${gbp(p.moveISA)}</td></tr>
+      <tr><td><b>Discretionary</b></td><td class="num"><b>${gbp(disc)}</b></td></tr>
+    </tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>Buckets <span class="sub">${gbp(savingsTotal)} across all pots · ${gbp(bySav)} in savings · ${gbp(byISA)} in ISA</span></h2>
+    <table class="ledger">
+      <thead><tr><th>Bucket</th><th class="num">Balance</th><th class="num">Target</th><th>Progress</th></tr></thead>
+      <tbody>${state.buckets.map(b=>{
+        const pct=b.goal?Math.min(num(b.balance)/num(b.goal),1):null;
+        return `<tr><td>${esc(b.name)}</td><td class="num">${gbp(b.balance)}</td>
+        <td class="num">${b.goal?gbp0(b.goal):""}</td>
+        <td>${pct!=null?`<div class="bar" title="${Math.round(pct*100)}%"><i style="width:${Math.round(pct*100)}%"></i></div>`:""}</td></tr>`}).join("")}
+      </tbody>
+    </table>
+    ${driftFlags.length?`<p class="hint" style="margin-top:10px"><span class="chip claret">Off track</span> ${driftFlags.map(x=>`${esc(x.b.name)} needs ${gbp0(x.t.required)} a month`).join("; ")}. Details on the Buckets tab.</p>`:""}
+  </div>`;
+}
+function toggleTransfer(id){
+  const p=currentPeriod();const t=(p.transfers||[]).find(x=>x.id===id);
+  if(t){t.done=!t.done;persist();render();if(t.done)toast("Stamped. "+gbp(t.amount)+" moved to Starling.")}
+}
+function markReimb(pid){
+  const p=state.periods.find(x=>x.id===pid);if(!p)return;
+  p.reimbReceived=num(document.getElementById("reimbActual").value);
+  p.reimbPaid=true;persist();render();toast("Reimbursement recorded.");
+}
+function unmarkReimb(pid){const p=state.periods.find(x=>x.id===pid);if(p){p.reimbPaid=false;persist();render()}}
+/* ------------------------ buckets ------------------------ */
+function viewBuckets(){
+  const rows=state.buckets.map(b=>{
+    const t=targetMaths(b);
+    const pct=b.goal?Math.min(num(b.balance)/num(b.goal),1):null;
+    return `<tr>
+      <td><input class="editable" style="width:120px" value="${esc(b.name)}" onchange="editBucket('${b.id}','name',this.value)"></td>
+      <td><select onchange="editBucket('${b.id}','heldIn',this.value)">
+        ${["Savings account","ISA"].map(h=>`<option ${b.heldIn===h?"selected":""}>${h}</option>`).join("")}</select></td>
+      <td class="num"><input class="num editable" style="width:88px" value="${b.goal??""}" placeholder="none" onchange="editBucket('${b.id}','goal',this.value)"></td>
+      <td><input type="date" class="editable" style="width:135px" value="${b.targetDate??""}" onchange="editBucket('${b.id}','targetDate',this.value)"></td>
+      <td class="num"><input class="num editable" style="width:74px" value="${b.monthly??0}" onchange="editBucket('${b.id}','monthly',this.value)"></td>
+      <td class="num"><input class="num editable" style="width:92px" value="${b.balance??0}" onchange="editBucket('${b.id}','balance',this.value)"></td>
+      <td>${t?(t.onTrack?`<span class="chip green">On track</span>`:`<span class="chip claret">${gbp0(t.required)}/mo needed</span>`)
+            :(pct!=null?`<div class="bar"><i style="width:${Math.round(pct*100)}%"></i></div>`:"")}</td>
+      <td class="flexrow">
+        <button class="btn small quiet" onclick="withdrawBucket('${b.id}')">Withdraw</button>
+        <button class="btn small danger" onclick="removeBucket('${b.id}')">×</button>
+      </td>
+    </tr>
+    ${t?`<tr><td colspan="8" style="padding-top:0"><span class="hint">${esc(b.name)}: ${gbp(t.remaining)} still to save, ${t.monthsLeft} month${t.monthsLeft===1?"":"s"} to ${fmtDate(b.targetDate)}. Needs ${gbp(t.required)} a month; you contribute ${gbp(num(b.monthly))}${t.onTrack?", which covers it.":`, a shortfall of ${gbp(Math.abs(t.drift))} a month.`}</span></td></tr>`:""}
+    ${(b.withdrawals&&b.withdrawals.length)?`<tr><td colspan="8" style="padding-top:0"><details class="bucket-log"><summary>${b.withdrawals.length} withdrawal${b.withdrawals.length===1?"":"s"}</summary><ul class="notebook">${b.withdrawals.map(w=>`<li>${fmtDate(w.date)}: ${gbp(w.amount)}${w.note?` for ${esc(w.note)}`:""}</li>`).join("")}</ul></details></td></tr>`:""}`;
+  }).join("");
+  return `
+  <div class="card">
+    <h2>Savings buckets <span class="sub">yellow cells are yours to edit</span></h2>
+    <div style="overflow-x:auto">
+    <table class="ledger">
+      <thead><tr><th>Bucket</th><th>Held in</th><th class="num">Goal</th><th>Target date</th><th class="num">Monthly</th><th class="num">Balance</th><th>Status</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <div class="flexrow" style="margin-top:12px">
+      <button class="btn quiet" onclick="addBucket()">Add bucket</button>
+    </div>
+    <p class="hint">Target date maths: for any bucket with both a goal and a date, Ledger works out the monthly amount needed from today's balance and flags a shortfall against what you actually contribute.</p>
+  </div>
+  <div class="card">
+    <h2>Payday transfers on the 28th</h2>
+    <table class="ledger"><tbody>
+      <tr><td>Move to Savings account</td><td class="num"><b>${gbp(sumMove("Savings account"))}</b></td></tr>
+      <tr><td>Move to ISA</td><td class="num"><b>${gbp(sumMove("ISA"))}</b></td></tr>
+      <tr><td>Total monthly contributions</td><td class="num">${gbp(sumMove("Savings account")+sumMove("ISA"))}</td></tr>
+    </tbody></table>
+    <p class="hint">These are the sums of each bucket's monthly contribution, split by where the bucket is held. Starting a new period applies the contributions to bucket balances automatically.</p>
+  </div>`;
+}
+function editBucket(id,field,val){
+  const b=state.buckets.find(x=>x.id===id);if(!b)return;
+  if(["goal","monthly","balance"].includes(field))b[field]=val===""?null:num(val);
+  else b[field]=val||null;
+  persist();render();
+}
+function addBucket(){state.buckets.push({id:uid(),name:"New bucket",type:"Short term goal",heldIn:"Savings account",goal:null,targetDate:null,monthly:0,balance:0,withdrawals:[]});persist();render()}
+function removeBucket(id){
+  const b=state.buckets.find(x=>x.id===id);
+  if(b&&confirm(`Remove the ${b.name} bucket? Its balance record goes with it.`)){state.buckets=state.buckets.filter(x=>x.id!==id);persist();render()}
+}
+function withdrawBucket(id){
+  const b=state.buckets.find(x=>x.id===id);if(!b)return;
+  const amt=num(prompt(`Withdraw how much from ${b.name}? Balance is ${gbp(b.balance)}.`));
+  if(!amt)return;
+  const note=prompt("What was it for? (optional)")||"";
+  b.withdrawals=b.withdrawals||[];
+  b.withdrawals.push({date:todayISO(),amount:amt,note});
+  b.balance=Math.round((num(b.balance)-amt)*100)/100;
+  persist();render();toast(gbp(amt)+" withdrawn from "+b.name+".");
+}
+
+/* ------------------------ periods ------------------------ */
+function viewPeriods(){
+  const nx=nextPeriodDates();
+  const rows=[...state.periods].reverse().map(p=>{
+    const disc=discretionaryOf(p);
+    return `<tr>
+      <td>${esc(p.label)}</td>
+      <td class="num">${gbp(p.income)}</td>
+      <td class="num">${gbp(p.reimbPaid?p.reimbReceived:p.reimbExpected)} ${p.reimbPaid?`<span class="chip green">rec'd</span>`:`<span class="chip brass">pending</span>`}</td>
+      <td class="num">${gbp(p.billsTotal)}</td>
+      <td class="num">${gbp(num(p.moveSavings)+num(p.moveISA))}</td>
+      <td class="num"><b>${gbp(disc)}</b></td>
+      <td class="num">${(p.transfers||[]).filter(t=>t.done).length}/${(p.transfers||[]).length}</td>
+    </tr>${p.notes?`<tr><td colspan="7" style="padding-top:0"><span class="hint">${esc(p.notes)}</span></td></tr>`:""}`;
+  }).join("");
+  return `
+  <div class="card">
+    <h2>Start the next period <span class="sub">${nx.label}</span></h2>
+    <p style="font-size:.88rem">On payday this does the whole ritual in one go: applies bucket contributions, records the two savings transfers to make, and sets up the weekly Starling envelopes.</p>
+    <table class="ledger" style="margin-top:10px"><tbody>
+      <tr><td>Pay expected</td><td class="num">${gbp(state.settings.pay)}</td></tr>
+      <tr><td>Reimbursement expected</td><td class="num">${gbp(state.settings.expectedReimb)}</td></tr>
+      <tr><td>Bills</td><td class="num">${gbp(sumBills())}</td></tr>
+      <tr><td>To Savings account / ISA</td><td class="num">${gbp(sumMove("Savings account"))} / ${gbp(sumMove("ISA"))}</td></tr>
+      <tr><td><b>Discretionary for envelopes</b></td><td class="num"><b>${gbp(num(state.settings.pay)+num(state.settings.expectedReimb)-sumBills()-sumMove("Savings account")-sumMove("ISA"))}</b></td></tr>
+    </tbody></table>
+    <button class="btn" style="margin-top:12px" onclick="startPeriod()">Start ${nx.label}</button>
+  </div>
+  <div class="card">
+    <h2>Period history</h2>
+    ${state.periods.length?`<div style="overflow-x:auto"><table class="ledger">
+      <thead><tr><th>Period</th><th class="num">Pay</th><th class="num">Reimb.</th><th class="num">Bills</th><th class="num">Saved</th><th class="num">Discretionary</th><th class="num">Envelopes</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`:`<p class="empty">No periods yet.</p>`}
+  </div>`;
+}
+function startPeriod(){
+  const nx=nextPeriodDates();
+  const income=num(state.settings.pay),reimb=num(state.settings.expectedReimb);
+  const billsTotal=sumBills(),mS=sumMove("Savings account"),mI=sumMove("ISA");
+  const disc=income+reimb-billsTotal-mS-mI;
+  if(!confirm(`Start ${nx.label}?\n\nThis will add ${gbp(mS+mI)} of contributions to your buckets and create ${Math.ceil((Math.round((new Date(nx.end+"T12:00:00")-new Date(nx.start+"T12:00:00"))/86400000)+1)/7)} weekly envelopes.\n\nRemember the payday transfers: ${gbp(mS)} to the Savings account and ${gbp(mI)} to the ISA.`))return;
+  for(const b of state.buckets){if(num(b.monthly))b.balance=Math.round((num(b.balance)+num(b.monthly))*100)/100}
+  state.periods.push({
+    id:uid(),label:nx.label,start:nx.start,end:nx.end,
+    income,reimbExpected:reimb,reimbReceived:null,reimbPaid:false,
+    billsTotal,moveSavings:mS,moveISA:mI,notes:"",
+    transfers:buildTransfers(nx.start,nx.end,disc)
+  });
+  persist();go("dash");toast("New period started. Envelopes are ready.");
+}
+/* ------------------------ setup ------------------------ */
+function viewSetup(){
+  return `
+  <div class="card">
+    <h2>Money coming in</h2>
+    <div class="formrow"><label>Take home pay (monthly, lands on the 28th)</label>
+      <input class="num editable" style="width:110px" value="${state.settings.pay}" onchange="editSetting('pay',this.value)"></div>
+    <div class="formrow"><label>Expected reimbursement (typical month)</label>
+      <input class="num editable" style="width:110px" value="${state.settings.expectedReimb}" onchange="editSetting('expectedReimb',this.value)"></div>
+    <div class="formrow"><label>Barclays floor (buffer kept in the current account)</label>
+      <input class="num editable" style="width:110px" value="${state.settings.buffer}" onchange="editSetting('buffer',this.value)"></div>
+  </div>
+  <div class="card">
+    <h2>Fixed bills <span class="sub">exactly as they leave Barclays · total ${gbp(sumBills())}</span></h2>
+    <div style="overflow-x:auto"><table class="ledger">
+      <thead><tr><th>Bill</th><th class="num">Amount</th><th class="num">Day</th><th></th></tr></thead>
+      <tbody>${state.bills.map(b=>`<tr>
+        <td><input class="editable" style="width:170px" value="${esc(b.name)}" onchange="editBill('${b.id}','name',this.value)"></td>
+        <td class="num"><input class="num editable" style="width:88px" value="${b.amount}" onchange="editBill('${b.id}','amount',this.value)"></td>
+        <td class="num"><input class="num editable" style="width:52px" value="${b.day}" onchange="editBill('${b.id}','day',this.value)"></td>
+        <td><button class="btn small danger" onclick="removeBill('${b.id}')">×</button></td>
+      </tr>`).join("")}</tbody>
+    </table></div>
+    <button class="btn quiet" style="margin-top:12px" onclick="addBill()">Add bill</button>
+    <p class="hint">Days of month feed the bill radar. Changes apply from the next period; the current period keeps the totals it started with.</p>
+  </div>
+  <div class="card">
+    <h2>The four accounts</h2>
+    <table class="ledger"><tbody>
+      <tr><td><b>Barclays current</b></td><td>Pay and reimbursement land here; all bills leave here; holds the ${gbp(state.settings.buffer)} floor.</td></tr>
+      <tr><td><b>Starling</b></td><td>Spending only. One envelope transfer a week; the card balance is what is safe to spend.</td></tr>
+      <tr><td><b>Barclays savings</b></td><td>Annual expenses and short term buckets.</td></tr>
+      <tr><td><b>ISA</b></td><td>Long term buckets.</td></tr>
+    </tbody></table>
+  </div>`;
+}
+function editSetting(k,v){state.settings[k]=num(v);persist();render()}
+function editBill(id,field,val){const b=state.bills.find(x=>x.id===id);if(!b)return;b[field]=field==="name"?val:num(val);persist();render()}
+function addBill(){state.bills.push({id:uid(),name:"New bill",amount:0,day:1});persist();render()}
+function removeBill(id){const b=state.bills.find(x=>x.id===id);if(b&&confirm(`Remove ${b.name}?`)){state.bills=state.bills.filter(x=>x.id!==id);persist();render()}}
+
+/* ------------------------ sync (GitHub Gist) ------------------------ */
+function viewSync(){
+  const token=localStorage.getItem(LS_TOKEN)||"";
+  const key=localStorage.getItem(LS_APIKEY)||"";
+  return `
+  <div class="card">
+    <h2>GitHub sync <span class="sub">private Gist, same pattern as Signal</span></h2>
+    <div class="formrow"><label>Personal access token (gist scope only)</label>
+      <input type="password" id="ghToken" style="width:230px" value="${esc(token)}" placeholder="ghp_..."></div>
+    <div class="formrow"><label>Gist ID (leave blank and push once to create)</label>
+      <input id="gistId" style="width:230px" value="${esc(state.settings.gistId||"")}" placeholder="created on first push"></div>
+    <div class="flexrow" style="margin-top:12px">
+      <button class="btn" onclick="pushGist()">Push to Gist</button>
+      <button class="btn quiet" onclick="pullGist()">Pull from Gist</button>
+    </div>
+    <p class="hint">The token lives only in this browser's storage, never inside the synced file. Last saved: ${new Date(state.updatedAt).toLocaleString("en-GB")}. Pulling replaces this device's data if the Gist copy is newer; you will be asked first.</p>
+  </div>
+  <div class="card">
+    <h2>Adviser API key</h2>
+    <div class="formrow"><label>Anthropic API key (only needed once hosted outside Claude)</label>
+      <input type="password" id="apiKey" style="width:230px" value="${esc(key)}" placeholder="sk-ant-..."></div>
+    <button class="btn quiet" style="margin-top:10px" onclick="saveKeys()">Save keys</button>
+    <p class="hint">Inside Claude's preview the adviser works without a key. Once this file lives on GitHub Pages, add a key from console.anthropic.com; it is stored only in this browser and costs pennies per session.</p>
+  </div>
+  <div class="card">
+    <h2>Backup</h2>
+    <div class="flexrow">
+      <button class="btn quiet" onclick="exportJSON()">Export JSON</button>
+      <button class="btn quiet" onclick="document.getElementById('importFile').click()">Import JSON</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(this)">
+    </div>
+  </div>`;
+}
+function saveKeys(){
+  localStorage.setItem(LS_TOKEN,document.getElementById("ghToken").value.trim());
+  localStorage.setItem(LS_APIKEY,document.getElementById("apiKey").value.trim());
+  state.settings.gistId=document.getElementById("gistId").value.trim();
+  persist(false);toast("Keys saved on this device.");
+}
+async function ghFetch(url,opts={}){
+  const token=(document.getElementById("ghToken")?.value||localStorage.getItem(LS_TOKEN)||"").trim();
+  if(!token)throw new Error("Add a GitHub token first.");
+  const r=await fetch(url,{...opts,headers:{Authorization:"Bearer "+token,Accept:"application/vnd.github+json",...(opts.headers||{})}});
+  if(!r.ok)throw new Error("GitHub said "+r.status+". Check the token has the gist scope.");
+  return r.json();
+}
+async function pushGist(){
+  try{
+    saveKeys();
+    const body={description:"Ledger budget data",public:false,files:{"ledger.json":{content:JSON.stringify(state,null,2)}}};
+    let g;
+    if(state.settings.gistId){g=await ghFetch("https://api.github.com/gists/"+state.settings.gistId,{method:"PATCH",body:JSON.stringify(body)})}
+    else{g=await ghFetch("https://api.github.com/gists",{method:"POST",body:JSON.stringify(body)});state.settings.gistId=g.id;persist(false)}
+    render();toast("Pushed to Gist.");
+  }catch(e){toast(e.message)}
+}
+async function pullGist(){
+  try{
+    saveKeys();
+    if(!state.settings.gistId)throw new Error("No Gist ID yet. Push once to create it.");
+    const g=await ghFetch("https://api.github.com/gists/"+state.settings.gistId);
+    const remote=JSON.parse(g.files["ledger.json"].content);
+    const local=new Date(state.updatedAt),rem=new Date(remote.updatedAt);
+    if(rem<local&&!confirm("The Gist copy is older than this device's data. Replace local data anyway?"))return;
+    remote.settings.gistId=state.settings.gistId;
+    state=remote;persist(false);render();toast("Pulled from Gist.");
+  }catch(e){toast(e.message)}
+}
+function exportJSON(){
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:"application/json"}));
+  a.download="ledger-backup-"+todayISO()+".json";a.click();
+}
+function importJSON(inp){
+  const f=inp.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.version)throw 0;if(confirm("Replace all data on this device with the imported file?")){state=d;persist();render();toast("Imported.")}}catch(e){toast("That file is not a Ledger backup.")}};
+  r.readAsText(f);
+}
+/* ------------------------ adviser ------------------------ */
+const ADVISER_MODES={
+  review:{label:"Period review",opener:"Run a review of my current position and recent periods."},
+  question:{label:"Ask a question",opener:null},
+  decision:{label:"Decision check",opener:null}
+};
+function adviserContext(){
+  const p=currentPeriod();
+  const disc=p?discretionaryOf(p):0;
+  const totalIn=p?num(p.income)+num(p.reimbPaid?p.reimbReceived:p.reimbExpected):0;
+  const saved=p?num(p.moveSavings)+num(p.moveISA):0;
+  const savingsRate=totalIn?(saved/totalIn*100):0;
+  const essentials=sumBills();
+  const emergency=state.buckets.find(b=>/emergency/i.test(b.name));
+  const emergencyMonths=emergency&&essentials?num(emergency.balance)/essentials:null;
+  const drift=state.buckets.map(b=>({name:b.name,t:targetMaths(b)})).filter(x=>x.t)
+    .map(x=>`${x.name}: needs ${x.t.required.toFixed(0)}/mo for ${x.t.monthsLeft} months, contributing ${num(state.buckets.find(b=>b.name===x.name).monthly).toFixed(0)}/mo, ${x.t.onTrack?"on track":"SHORTFALL "+Math.abs(x.t.drift).toFixed(0)+"/mo"}`);
+  const periodLines=state.periods.slice(-6).map(pp=>{
+    const d=discretionaryOf(pp);
+    return `${pp.label}: income ${num(pp.income).toFixed(0)}, reimbursement ${num(pp.reimbPaid?pp.reimbReceived:pp.reimbExpected).toFixed(0)}${pp.reimbPaid?"":" (pending)"}, bills ${num(pp.billsTotal).toFixed(0)}, saved ${(num(pp.moveSavings)+num(pp.moveISA)).toFixed(0)}, discretionary ${d.toFixed(0)}, envelopes moved ${(pp.transfers||[]).filter(t=>t.done).length}/${(pp.transfers||[]).length}`;
+  });
+  const withdrawals=state.buckets.flatMap(b=>(b.withdrawals||[]).map(w=>`${w.date} ${b.name} ${w.amount.toFixed(2)}${w.note?" ("+w.note+")":""}`)).slice(-10);
+  return `CLIENT FILE (all figures GBP)
+Today: ${todayISO()}. Payday the 28th; budget month runs 28th to 27th.
+Accounts: Barclays current (income in, bills out, floor of ${num(state.settings.buffer).toFixed(0)} kept as buffer); Starling (weekly spending envelope only); Barclays savings (short term buckets); cash ISA (long term buckets).
+
+COMPUTED METRICS
+Monthly take home pay: ${num(state.settings.pay).toFixed(0)}; typical reimbursement from partner: ${num(state.settings.expectedReimb).toFixed(0)}.
+Fixed bills total: ${essentials.toFixed(2)}/mo across ${state.bills.length} bills (includes a 300 mortgage overpayment).
+Largest bills: ${[...state.bills].sort((a,b)=>b.amount-a.amount).slice(0,5).map(b=>`${b.name} ${num(b.amount).toFixed(0)}`).join(", ")}.
+Current period discretionary: ${disc.toFixed(0)} (${p?(p.transfers||[]).length:0} weekly envelopes of ~${p&&p.transfers&&p.transfers.length?p.transfers[0].amount.toFixed(0):0}).
+Savings rate this period: ${savingsRate.toFixed(1)}% of money in.
+Total across buckets: ${state.buckets.reduce((a,b)=>a+num(b.balance),0).toFixed(2)}.
+${emergencyMonths!=null?`Emergency fund: ${num(emergency.balance).toFixed(0)} of ${num(emergency.goal||0).toFixed(0)} goal = ${emergencyMonths.toFixed(1)} months of fixed bills.`:""}
+Bucket target maths: ${drift.length?drift.join("; "):"no dated goals"}.
+Buckets: ${state.buckets.map(b=>`${b.name} ${num(b.balance).toFixed(0)} (${b.heldIn}${num(b.monthly)?", +"+num(b.monthly).toFixed(0)+"/mo":""})`).join("; ")}.
+
+PERIOD HISTORY (up to last 6)
+${periodLines.join("\n")}
+${withdrawals.length?`\nRECENT BUCKET WITHDRAWALS\n${withdrawals.join("\n")}`:""}
+${state.adviser.notebook.length?`\nADVISER NOTEBOOK (your own accumulated observations)\n${state.adviser.notebook.map(n=>"- "+n).join("\n")}`:""}`;
+}
+const ADVISER_SYSTEM=()=>`You are the client's personal financial adviser inside his budgeting app, Ledger. You have the client's full, current numbers in the client file below and you behave like a proper fee-only planner: analytical, specific, and grounded in their figures, never generic.
+
+Discipline for every reply:
+- British English. GBP. Never use em dashes, en dashes, or hyphens to break clauses; use commas, semicolons, or full stops.
+- Lead with the numbers. Every claim cites a figure from the file or a calculation you show briefly (for example "bills are 54% of joint money in").
+- Be direct about trade-offs and risks. If something is off track, say so plainly and quantify the gap. If something is going well, quantify that too rather than praising vaguely.
+- End Period review replies with a short "What I would do" list of at most three prioritised, concrete actions with amounts. For other modes, give one clear recommendation.
+- Maximum 220 words. At most one question per reply, only when the answer would change your advice.
+- Analysis and general guidance only; you are not a regulated adviser. Do not recommend specific investment products, funds, or providers. If asked, explain the trade-offs in general terms and suggest regulated advice for product selection.
+- When you learn something durable about the client's finances or habits worth remembering, add a final line "NOTE: ..." (max one per reply). Never mention the notebook mechanism.
+
+Useful angles to draw on when relevant: savings rate; emergency cover in months of fixed bills; whether the 300/mo mortgage overpayment still beats other uses once the emergency fund completes; bill creep across periods; envelope adherence (transfers moved versus planned); reimbursement timing risk; sinking fund adequacy for annual costs; the buffer floor.
+
+${adviserContext()}`;
+function viewAdviser(){
+  const a=state.adviser;
+  return `
+  <div class="card">
+    <h2>Adviser <span class="sub">analysis, not regulated financial advice</span></h2>
+    <div class="flexrow" style="margin-bottom:10px">
+      <select id="advMode" onchange="state.adviser.mode=this.value;persist(false)">
+        ${Object.entries(ADVISER_MODES).map(([k,m])=>`<option value="${k}" ${a.mode===k?"selected":""}>${m.label}</option>`).join("")}
+      </select>
+      <button class="btn small" onclick="startAdviser()">${a.messages.length?"Continue":"Begin session"}</button>
+      ${a.messages.length?`<button class="btn small quiet" onclick="if(confirm('Clear this conversation? Notebook entries are kept.')){state.adviser.messages=[];persist();render()}">New session</button>`:""}
+    </div>
+    <div class="chat" id="chat">
+      ${a.messages.length?a.messages.map(m=>`<div class="msg ${m.role==="user"?"user":"adviser"}">${esc(m.content).replace(/NOTE:.*$/m,"").trim().replace(/\*\*(.+?)\*\*/g,"<b>$1</b>")}</div>`).join("")
+      :`<p class="empty">Pick a mode and begin. Period review reads your whole file; Decision check is for questions like "can the Holiday pot afford Sidmouth again in October".</p>`}
+      <div id="thinking" style="display:none" class="msg adviser">Reading the ledger...</div>
+    </div>
+    <div class="chatbar">
+      <textarea id="advInput" placeholder="${a.mode==="decision"?"Describe the decision, with amounts if you have them":"Ask about your numbers"}" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAdviser()}"></textarea>
+      <button class="btn" onclick="sendAdviser()">Send</button>
+    </div>
+    ${a.notebook.length?`<details style="margin-top:12px"><summary class="hint" style="cursor:pointer">Adviser's notebook (${a.notebook.length})</summary><ul class="notebook">${a.notebook.map((n,i)=>`<li>${esc(n)} <button class="btn small quiet" onclick="state.adviser.notebook.splice(${i},1);persist();render()">forget</button></li>`).join("")}</ul></details>`:""}
+  </div>`;
+}
+function startAdviser(){
+  const mode=state.adviser.mode;
+  const opener=ADVISER_MODES[mode].opener;
+  if(opener&&!state.adviser.messages.length){sendAdviser(opener)}
+  else{document.getElementById("advInput").focus()}
+}
+async function sendAdviser(preset){
+  const inp=document.getElementById("advInput");
+  const text=(preset||inp.value).trim();
+  if(!text)return;
+  if(!preset)inp.value="";
+  state.adviser.messages.push({role:"user",content:text});
+  persist();render();
+  const th=document.getElementById("thinking");th.style.display="block";
+  document.getElementById("chat").scrollTop=1e9;
+  try{
+    const key=(localStorage.getItem(LS_APIKEY)||"").trim();
+    const headers={"Content-Type":"application/json"};
+    if(key){headers["x-api-key"]=key;headers["anthropic-version"]="2023-06-01";headers["anthropic-dangerous-direct-browser-access"]="true"}
+    const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers,
+      body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1000,system:ADVISER_SYSTEM(),
+        messages:state.adviser.messages.map(m=>({role:m.role,content:m.content}))})});
+    const data=await r.json();
+    if(data.error)throw new Error(data.error.message||"API error");
+    const reply=(data.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("\n").trim();
+    const noteMatch=reply.match(/^NOTE:\s*(.+)$/m);
+    if(noteMatch&&!state.adviser.notebook.includes(noteMatch[1].trim()))state.adviser.notebook.push(noteMatch[1].trim());
+    state.adviser.messages.push({role:"assistant",content:reply});
+    persist();
+  }catch(e){
+    state.adviser.messages.push({role:"assistant",content:"The adviser could not be reached. "+e.message+(localStorage.getItem(LS_APIKEY)?"":" If this file is hosted outside Claude, add an API key on the Sync tab.")});
+    persist(false);
+  }
+  render();
+}
+render();
+window.addEventListener("hashchange",()=>{const h=location.hash.replace("#","");if(TABS.some(t=>t[0]===h)){activeTab=h;render()}});
+</script>
+</body>
+</html>
