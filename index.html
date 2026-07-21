@@ -194,8 +194,9 @@ function buildTransfers(startISO,endISO,discretionary){
   return t;
 }
 function billsInNext7Days(){
-  const now=new Date();const out=[];
+  const now=new Date();const out=[];const p=currentPeriod();
   for(const b of state.bills){
+    if(p&&(p.billOverrides||{})[b.id]===true)continue;
     for(let add=0;add<=7;add++){
       const d=new Date(now);d.setDate(d.getDate()+add);
       if(d.getDate()===Number(b.day)){out.push({...b,when:d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"}),inDays:add});break}
@@ -307,7 +308,19 @@ function viewDash(){
       </div>
       ${c?`<p class="hint" style="margin-top:8px">${c.balance>=need
         ?`<span class="chip green">Covered</span> ${gbp(c.balance)} on ${fmtDate(c.date)} leaves ${gbp(c.balance-need)} above what is needed.`
-        :`<span class="chip claret">Short</span> ${gbp(c.balance)} on ${fmtDate(c.date)} is ${gbp(need-c.balance)} below what is needed; top up from a bucket or the next envelope.`}${stale?" This check is from a previous day; enter today's balance for a fresh one.":""}</p>`:""}`})()}
+        :`<span class="chip claret">Short</span> ${gbp(c.balance)} on ${fmtDate(c.date)} is ${gbp(need-c.balance)} below what is needed; top up from a bucket or the next envelope.`}${stale?" This check is from a previous day; enter today's balance for a fresh one.":""}</p>`:""}
+      <details style="margin-top:10px"><summary class="hint" style="cursor:pointer">Bills this period (${u.items.length} still to leave)</summary>
+      <table class="ledger" style="margin-top:8px"><tbody>
+      ${state.bills.map(b=>{const p2=currentPeriod();const due=billDueInPeriod(b,p2);if(!due)return "";
+        const paid=billEffectivePaid(b,p2);
+        const ov=(p2.billOverrides||{})[b.id];
+        return `<tr><td>${esc(b.name)}</td><td>${due.toLocaleDateString("en-GB",{day:"numeric",month:"short"})}</td>
+        <td class="num">${gbp(b.amount)}</td>
+        <td>${paid?`<span class="chip green">Paid${ov===true?" early":""}</span>`:`<span class="chip grey">Due</span>`}</td>
+        <td><button class="btn small quiet" onclick="toggleBillPaid('${b.id}')">${paid?"Mark due":"Mark paid"}</button></td></tr>`}).join("")}
+      </tbody></table>
+      <p class="hint" style="margin-top:6px">Bills flip to Paid automatically once their date passes. Use the toggle when one leaves early or late; the radar and the check above follow it.</p>
+      </details>`})()}
   </div>
 
   <div class="card">
@@ -341,16 +354,37 @@ function toggleTransfer(id){
   if(t){t.done=!t.done;persist();render();if(t.done)toast("Stamped. "+gbp(t.amount)+" moved to Starling.")}
 }
 
+function billDueInPeriod(b,p){
+  const start=new Date(p.start+"T12:00:00"),end=new Date(p.end+"T12:00:00");
+  const day=Number(b.day);
+  const base=day>=28?start:end;
+  const due=new Date(base.getFullYear(),base.getMonth(),day,12);
+  return (due>=start&&due<=end)?due:null;
+}
+function billEffectivePaid(b,p){
+  const today=new Date();today.setHours(12,0,0,0);
+  const due=billDueInPeriod(b,p);
+  const auto=!due||due<today;
+  const ov=(p.billOverrides||{})[b.id];
+  return ov===undefined?auto:ov;
+}
+function toggleBillPaid(billId){
+  const p=currentPeriod();if(!p)return;
+  const b=state.bills.find(x=>x.id===billId);if(!b)return;
+  p.billOverrides=p.billOverrides||{};
+  const due=billDueInPeriod(b,p);
+  const auto=!due||due<new Date(new Date().setHours(12,0,0,0));
+  const next=!billEffectivePaid(b,p);
+  if(next===auto)delete p.billOverrides[b.id];else p.billOverrides[b.id]=next;
+  persist();render();
+}
 function unpaidBillsThisPeriod(){
   const p=currentPeriod();if(!p)return {total:0,items:[]};
-  const start=new Date(p.start+"T12:00:00"),end=new Date(p.end+"T12:00:00");
-  const today=new Date();today.setHours(12,0,0,0);
   const items=[];
   for(const b of state.bills){
-    const day=Number(b.day);
-    const base=day>=28?start:end;
-    const due=new Date(base.getFullYear(),base.getMonth(),day,12);
-    if(due>=start&&due<=end&&due>=today)items.push({name:b.name,amount:num(b.amount),due});
+    if(billEffectivePaid(b,p))continue;
+    const due=billDueInPeriod(b,p);
+    items.push({name:b.name,amount:num(b.amount),due});
   }
   items.sort((a,c)=>a.due-c.due);
   return {total:items.reduce((a,c)=>a+c.amount,0),items};
